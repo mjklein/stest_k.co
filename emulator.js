@@ -8,7 +8,7 @@
 // operation of a real-world elevator system....
   const env = {
     // Physical Environment
-      "cElevators": 10,                 // int
+      "cElevators": 4,                 // int
       "cFloors": 30,                    // int
       "iFloorHeight": 8,                // int (height of each floor, in feet)
     // Elevator settings
@@ -54,9 +54,6 @@
     floors[i] = new FloorController(i);
   }
 
-  console.log(new Date() + ' ==> System initialized');
-
-
   // interval timer (to sync all processing actions...)
   // NOTE: in order to get 1-foot travel steps, we divide 1 (second) by the Carriage FPS -- this gives us
   //       the needed number of heartbeats (per second) needed to move a Carriage X feet during transit
@@ -66,12 +63,16 @@
   // create the (single) PeopleSimulator Object
   var peopleSimulater = new PeopleSimulator();
 
+  console.log(new Date() + ' ==> System initialized');
+
+/******************************* END OF INITIALIZATION ROUTINES *******************************************************/
+
 
 /*******************************************
  HELPER Functions
 *******************************************/
 function heartbeatProcessor() {
-    console.log(new Date() + ' ==> System Heartbeat...');
+    console.log(new Date() + '[Heartbeat]');
 
     // every heartbeat will trigger the following:
     // + move carriages in transit
@@ -105,18 +106,17 @@ function heartbeatProcessor() {
  ********************************************/
 function Carriage(idx, riders, location, state) {
   const inst = this;
-  var up = 1;
-  var down = 2;
-  var idle = 3;
-  var maintenance = 4;
-  var states = ["Up", "Down", "Idle", "Maintenance"]
+  inst.up = 1;
+  inst.down = 2;
+  inst.docked = 3;
+  inst.maintenance = 4;
+  inst.states = ["Up", "Down", "Docked", "Maintenance"];
 
   inst.myID = idx;                // self-identifier (indexer value)
-  inst.cTrip = 0;                 // trip counter
-  inst.cFloor = 0;                // floor counter
-  inst.state = state == undefined ? idle : state // idle the carriage (if 'state' param is undefined)
+  inst.cTrips = 0;                // trip counter
+  inst.cFloors = 0;               // floor counter
+  inst.state = state == undefined ? inst.docked : state // idle the carriage (if 'state' param is undefined)
   inst.location = location == undefined ? 0 : location // idle the carriage (if 'state' param is undefined)
-  inst.location = 0               // start at 0 ( => feet)
   inst.maxLocation = (env.cFloors - 1) * env.iFloorHeight     // location will be based on the BOTTOM of the floor
   inst.riders = riders == undefined ? [] : riders             // init Riders array (if not passed in as param)
 
@@ -125,7 +125,7 @@ function Carriage(idx, riders, location, state) {
     // console.log("Carriage #" + inst.myID + " state is: " + states[inst.state - 1]); // offset for zero-based Array
     // check the "state" of the elevator
      switch(inst.state) {
-         case up:
+         case inst.up:
            // carriage is on a Trip UP
            // not efficient, but easy to read...
            inst.location ++;
@@ -133,7 +133,7 @@ function Carriage(idx, riders, location, state) {
            break;
 
 
-         case down:
+         case inst.down:
            // carriage is on a Trip down...
            inst.location --;
            break;
@@ -205,7 +205,7 @@ function PeopleSimulator() {
       var rndDuration = Math.floor((Math.random() * (env.cMaxRiderCreateInterval - env.cMinRiderCreateInterval)) + 1);
       setTimeout(createRider, (env.cMinRiderCreateInterval + rndDuration) * 1000);
     }
-  }
+  };
   // inject a reider into the simulator immediately upon startup...
   createRider();
 }
@@ -246,8 +246,9 @@ function FloorController(floorNumber) {
     const inst = this;
     const off = 0;                                                   // const: indicates "call-state"
     const on = 1;                                                    // const: indicates "call-state"
-    const ridersWaiting = [];                                        // for for riders waiting the onBoard process
 
+    inst.ridersWaiting = [];                                        // for for riders waiting the onBoard process
+    inst.dockedCarriages = [];                                      // Array holding carriages awaiting ingress/egress
     inst.myFloorNumber = floorNumber;                               // Floors start with #1
     inst.myFloorHeight = (floorNumber - 1) * env.iFloorHeight;      // Floor-height is measured zero-based
     inst.upCallState = off;
@@ -260,6 +261,29 @@ function FloorController(floorNumber) {
       // add this rider to the waiting queue
       ridersWaiting.push(rider);
       console.log("Floor Controller #" + inst.myFloorNumber + " has new Rider [" + rider.myID +"]");
+
+      // Determine if the "Call" button has already been activated for the direction this Rider needs to travel...
+      if (((inst.myFloorNumber < rider.desinationFloor) && !inst.upCallState) ||
+         ((inst.myFloorNumber > rider.desinationFloor) && !inst.downCallState)) {
+          // Rider needs to travel UP and the upCallState is OFF...CALL an elevator
+          console.log("Floor Controller #" + inst.myFloorNumber + " has called carriage XXXX");
+          callCarriage();
+      }
+    };
+
+    var callCarriage = function() {
+        // Carriage prioritization:
+        // 1 - is a carriage ALREADY on that floor level?
+        // 2 - is an OCCUPIED carriage going to transit PAST this floor?
+        // 3 - which UNOCCUPIED carried is closest to this floor?
+
+        // step # 1 -- determine if this floor already has a Carriage "docked"
+        for(var i = 1; i <= env.cElevators; i++) {
+            if ((carriages[i].state == carriages[i].docked) && (carriages[i].location == inst.myFloorHeight)) {
+                console.log("Carriage #(%s) is DOCKED on Floor %f", i, inst.myFloorNumber);
+            }
+
+        }
     }
  }
 
