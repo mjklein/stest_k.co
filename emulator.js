@@ -11,9 +11,12 @@
     // Physical Environment
       "cElevators": 10,                 // int
       "cFloors": 30,                    // int
+      "iFloorHeight": 8,                // int (height of each floor, in feet)
     // Elevator settings
       "iFpsTravelSpeed": 3,             // int (feet per second)
       "cMaxRidersPerEle": 13,           // int
+      "cOpenTimePerRider": 5,           // int (number of seconds doors remaining open for EACH Rider enter/exit-ing
+      "cOpenTimeOverhead": 5,           // a "set" amount of time for door "mechanics" (independent of Rider count)
     // Rider settings
       "cNumOfSimulatedRiders": 100,     // int
       "cMinRiderCreateInterval": 3,     // seconds
@@ -90,6 +93,11 @@ function heartbeatProcessor() {
   idx = indexer value (int)
   riders = Array (of Rider objects)   **** stubbed in the event of deserialization/recovery
 
+  NOTES:
+  1) Each Carriage MUST keep track of its "trip" count (cTrip) which is determined by the following logic:
+     A) whenever an elevator enters the IDLE state
+     B) whenever an elevator changes directions (and travels the opposite direction)
+  2) Each Carriage MUST enter the "maintenance" state whenever it has
 
  ********************************************/
 function Carriage(idx, riders, location, state) {
@@ -97,21 +105,104 @@ function Carriage(idx, riders, location, state) {
   var up = 1;
   var down = 2;
   var idle = 3;
-  var states = ["Up", "Down", "Idle"]
+  var maintenance = 4;
+  var states = ["Up", "Down", "Idle", "Maintenance"]
 
-    inst.myID = idx;                // self-identifier (indexer value)
-    inst.cTrip = 0;                 // trip counter
-    inst.cFloor = 0;                // floor counter
-    inst.state = state == undefined ? idle : state // idle the carriage (if 'state' param is undefined)
+
+  inst.myID = idx;                // self-identifier (indexer value)
+  inst.cTrip = 0;                 // trip counter
+  inst.cFloor = 0;                // floor counter
+  inst.state = state == undefined ? idle : state // idle the carriage (if 'state' param is undefined)
+  inst.location = 0               // start at 0 ( => feet)
+  inst.maxLocation = (env.cFloors - 1) * env.iFloorHeight     // location will be based on the BOTTOM of the floor
 
   inst.move = function() {
     // check the "state" of the elevator
     console.log("Carriage #" + inst.myID + " state is: " + states[inst.state - 1]); // offset for zero-based Array
 
+     switch(inst.state) {
+         case up:
+           // carriage is on a Trip UP
+           // not efficient, but easy to read...
+           inst.location ++;
 
+           break;
+
+
+         case down:
+           // carriage is on a Trip down...
+           inst.location --;
+           break;
+     }
   };
+
+  inst.call = function(floor) {
+    // TODO: test for undefined 'floor' value
+
+
+  }
+
+  inst.openDoors = function() {
+    // REPORT that this Carriage has Opened its doors
+    // + let any ONBOARD Riders to exit the Carriage
+    // + report the NUMBER of riders that have exited
+    // + all NEW riders to enter the carriage
+    // + report the NUMBER of new riders that have entered
+
+  }
+
+  inst.closeDoors = function() {
+    // + determine if a TRIP has been completed (if so, test for MAINTENANCE mode)
+    // + close the Carriage doors
+    // + report the NEW total number of Riders in the Carriage
+    // + re-valuate the STATE of the Carriage:
+    //    IF riders == 0 -> IDLE, otherwise determine/continue travel
+    // NOTE: STATE MUST transition to IDLE BEFORE it can be set to UP or DOWN
+
+    
+  }
 };
 
+/********************************************
+ PEOPLE Simulator
+
+ This (singleton) is used to provide "human element" for the simulation. Based upon the environmental settings, it
+ will "inject" a new rider into the system by:
+  1) create a new Rider object
+  2) placing him/her on a floor location (randomized)
+  3) selecting a destination floor (other than the one they're currently located on)
+  4) selecting the appropriate 'Call' action of the corresponding FloorControl (ie, UP or DOWN, depending on transit
+     direction
+
+
+ ********************************************/
+function PeopleSimulator() {
+
+}
+
+function Rider() {
+
+
+}
+
+/********************************************
+ FLOOR CONTROLLER
+
+ Each Floor has it's own Controller which governs which carriage will respond to the floor's Call action. This is
+ determined by the simulation criteria:
+ 1) if a carriage is already there, it is utilized
+ 2) of not, the CLOSEST carriage will be called
+ 3) if there are more Riders than are allowed into the Carriage (after those exiting have been 'removed'), then
+    ANOTHER carriage will be called to pick up remaining Riders (and this will continue until all are serviced)
+
+ NOTES:
+ 1) A Controller MUST NEVER change the direction of a Carriage already transporting riders
+ ********************************************/
+function FloorController() {
+
+
+
+}
 
 
 // process.exit();
