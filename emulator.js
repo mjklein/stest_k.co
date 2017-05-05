@@ -35,8 +35,8 @@
  *        underlying capability is there if/when time allows.
 **/
 
-  const redisPort = 6379;                               // assuming REDIS is running on the default port
-  const redisIP = "127.0.0.1";                          // assuming " is running on local loopback interface
+  const redisPort = 6379;                                 // assuming REDIS is running on the default port
+  const redisIP = "127.0.0.1";                            // assuming " is running on local loopback interface
   const redisC = redis.createClient(redisPort, redisIP);  // the GLOBAL redisClient reference/object
 
 /*******************************************
@@ -53,6 +53,8 @@
   // 1-second interval timer (to sync all processing actions...)
   var heartbeatTimer = setInterval(heartbeatProcessor, 1000);
 
+  // create the SINGLETON PeopleSimulator Object
+  var peopleSimulater = new PeopleSimulator();
 
   // visual feedback in Init-process completion
   console.log(new Date() + ' ==> Environment Settings:');
@@ -77,11 +79,6 @@ function heartbeatProcessor() {
     ;
 };
 
-
-
-
-
-
 /********************************************
   ELEVATOR CARRIAGE
 
@@ -101,20 +98,21 @@ function heartbeatProcessor() {
 
  ********************************************/
 function Carriage(idx, riders, location, state) {
-  var inst = this;
+  const inst = this;
   var up = 1;
   var down = 2;
   var idle = 3;
   var maintenance = 4;
   var states = ["Up", "Down", "Idle", "Maintenance"]
 
-
   inst.myID = idx;                // self-identifier (indexer value)
   inst.cTrip = 0;                 // trip counter
   inst.cFloor = 0;                // floor counter
   inst.state = state == undefined ? idle : state // idle the carriage (if 'state' param is undefined)
+  inst.location = location == undefined ? 0 : location // idle the carriage (if 'state' param is undefined)
   inst.location = 0               // start at 0 ( => feet)
   inst.maxLocation = (env.cFloors - 1) * env.iFloorHeight     // location will be based on the BOTTOM of the floor
+  inst.riders = riders == undefined ? [] : riders             // init Riders array (if not passed in as param)
 
   inst.move = function() {
     // check the "state" of the elevator
@@ -159,7 +157,7 @@ function Carriage(idx, riders, location, state) {
     //    IF riders == 0 -> IDLE, otherwise determine/continue travel
     // NOTE: STATE MUST transition to IDLE BEFORE it can be set to UP or DOWN
 
-    
+
   }
 };
 
@@ -174,15 +172,37 @@ function Carriage(idx, riders, location, state) {
   4) selecting the appropriate 'Call' action of the corresponding FloorControl (ie, UP or DOWN, depending on transit
      direction
 
-
+  NOTE: A new Rider is created based upon a randomized timer-value (in seconds) that is between
+        env.cMinRiderCreateInterval and env.cMaxRiderCreateInterval
  ********************************************/
 function PeopleSimulator() {
+  const inst = this;
+  inst.cRiders = 0;                 // counter that keeps track of the TOTAL number of Riders that have been created
 
+  // check the "state" of the elevator
+  console.log("PeopleSimulator is initializing");
+
+  var createRider = function() {
+    var iFloor, iDestination;               // init for logic test
+
+    do {
+      iFloor = Math.floor((Math.random() * env.cFloors) + 1);
+      iDestination = Math.floor((Math.random() * env.cFloors) + 1);
+    }
+    while (iFloor == iDestination);    // kickout when iFloor and iDestination are different!
+
+    console.log("New rider; onBoard(%s) --> destination(%d)", iFloor, iDestination)
+  }
+  // inject a reider into the simulator immediately upon startup...
+  createRider();
 }
 
-function Rider() {
+// Simple RIDER class used to encapsulated Rider elements
+function Rider(onboardFloor, destinationFloor) {
+  const inst = this
 
-
+  inst.onboardFloor = onboardFloor
+  inst.desinationFloor = destinationFloor
 }
 
 /********************************************
