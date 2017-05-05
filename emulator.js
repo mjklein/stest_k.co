@@ -4,7 +4,6 @@
 ********************************************/
   const redis = require("redis");                       // mandatory NPM package (Redis client)
 
-
 // These are "environmental settings" which are taken as "best guess" assumptions in an attempt to approximate the
 // operation of a real-world elevator system....
   const env = {
@@ -42,24 +41,29 @@
 /*******************************************
  SYSTEM Initialization
 
- TODO:  Since Redis is used to provide ppersitence as a state-machine, this sections would (time permitting) incorporate
+ TODO:  Since Redis is used to provide persistence as a state-machine, this sections would (time permitting) incorporate
         the procedural steps needed to re-initialize the system following a soft-failure.
  ********************************************/
-  const carriages = [];
-  for (var i = 1; i <= env.cElevators; i++) {
-    carriages[i] = new Carriage(i);
-  };
-
-  // 1-second interval timer (to sync all processing actions...)
-  var heartbeatTimer = setInterval(heartbeatProcessor, 1000);
-
-  // create the SINGLETON PeopleSimulator Object
-  var peopleSimulater = new PeopleSimulator();
-
-  // visual feedback in Init-process completion
   console.log(new Date() + ' ==> Environment Settings:');
   console.log(JSON.stringify(env, null, 3));
+  const carriages = [];
+  const floors = [];
+  for (var i = 1; i <= env.cElevators; i++) {
+    // visual feedback in Init-process completion
+    carriages[i] = new Carriage(i);
+    floors[i] = new FloorController(i);
+  }
   console.log(new Date() + ' ==> System initialized');
+
+
+  // interval timer (to sync all processing actions...)
+  // NOTE: in order to get 1-foot travel steps, we divide 1 (second) by the Carriage FPS -- this gives us
+  //       the needed number of heartbeats (per second) needed to move a Carriage X feet during transit
+  // reference to Timer is held in to order to Cancel it for clean shutdown
+  var heartbeatTimer = setInterval(heartbeatProcessor, 1000 / env.iFpsTravelSpeed);
+
+  // create the (single) PeopleSimulator Object
+  var peopleSimulater = new PeopleSimulator();
 
 
 /*******************************************
@@ -78,6 +82,7 @@ function heartbeatProcessor() {
     }
     ;
 };
+
 
 /********************************************
   ELEVATOR CARRIAGE
@@ -115,9 +120,9 @@ function Carriage(idx, riders, location, state) {
   inst.riders = riders == undefined ? [] : riders             // init Riders array (if not passed in as param)
 
   inst.move = function() {
+    // debugging output:
+    // console.log("Carriage #" + inst.myID + " state is: " + states[inst.state - 1]); // offset for zero-based Array
     // check the "state" of the elevator
-    console.log("Carriage #" + inst.myID + " state is: " + states[inst.state - 1]); // offset for zero-based Array
-
      switch(inst.state) {
          case up:
            // carriage is on a Trip UP
@@ -141,7 +146,7 @@ function Carriage(idx, riders, location, state) {
   }
 
   inst.openDoors = function() {
-    // REPORT that this Carriage has Opened its doors
+    // REPORT this Carriage has Opened its doors
     // + let any ONBOARD Riders to exit the Carriage
     // + report the NUMBER of riders that have exited
     // + all NEW riders to enter the carriage
@@ -176,8 +181,8 @@ function Carriage(idx, riders, location, state) {
         env.cMinRiderCreateInterval and env.cMaxRiderCreateInterval
  ********************************************/
 function PeopleSimulator() {
-  const inst = this;
-  inst.cRiders = 0;                 // counter that keeps track of the TOTAL number of Riders that have been created
+  const activeRiders = [];         // hanger for all (active) Rider objects
+  var cRiders = 0;                 // counter that keeps track of the TOTAL number of Riders that have been created
 
   // check the "state" of the elevator
   console.log("PeopleSimulator is initializing");
@@ -190,8 +195,15 @@ function PeopleSimulator() {
       iDestination = Math.floor((Math.random() * env.cFloors) + 1);
     }
     while (iFloor == iDestination);    // kickout when iFloor and iDestination are different!
-
+    activeRiders[cRiders] = new Rider(iFloor, iDestination);
+    cRiders ++;
     console.log("New rider; onBoard(%s) --> destination(%d)", iFloor, iDestination)
+
+    // set timer to auto-create a new Rider based at the next (randomized) interval
+    if (cRiders < env.cNumOfSimulatedRiders) {
+      var rndDuration = Math.floor((Math.random() * (env.cMaxRiderCreateInterval - env.cMinRiderCreateInterval)) + 1);
+      setTimeout(createRider, (env.cMinRiderCreateInterval + rndDuration) * 1000);
+    }
   }
   // inject a reider into the simulator immediately upon startup...
   createRider();
@@ -217,8 +229,20 @@ function Rider(onboardFloor, destinationFloor) {
 
  NOTES:
  1) A Controller MUST NEVER change the direction of a Carriage already transporting riders
+ 2) Controllers are responsilbe for OPEN-ing and CLOSE-ing the doors to the carriage when needed
  ********************************************/
-function FloorController() {
+function FloorController(floorNumber) {
+    const inst = this;
+    const off = 0;                                                   // const: indicates "call-state"
+    const on = 1;                                                    // const: indicates "call-state"
+
+    inst.myFloorNumber = floorNumber;                               // Floors start with #1
+    inst.myFloorHeight = (floorNumber - 1) * env.iFloorHeight;      // Floor-height is measured zero-based
+    inst.upCallState = off;
+    inst.downCallState = off;
+
+    // check the "state" of the elevator
+    console.log("Floor Controller #" + floorNumber + " has been created");
 
 
 
