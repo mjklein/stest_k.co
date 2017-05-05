@@ -33,7 +33,6 @@
  * NOTE:  This solution will probably not reach the point where persistence/deserialization is built, but at least the
  *        underlying capability is there if/when time allows.
 **/
-
   const redisPort = 6379;                                 // assuming REDIS is running on the default port
   const redisIP = "127.0.0.1";                            // assuming " is running on local loopback interface
   const redisC = redis.createClient(redisPort, redisIP);  // the GLOBAL redisClient reference/object
@@ -49,10 +48,12 @@
   const carriages = [];
   const floors = [];
   for (var i = 1; i <= env.cElevators; i++) {
-    // visual feedback in Init-process completion
     carriages[i] = new Carriage(i);
+  }
+  for (var i = 1; i <= env.cFloors; i++) {
     floors[i] = new FloorController(i);
   }
+
   console.log(new Date() + ' ==> System initialized');
 
 
@@ -188,16 +189,16 @@ function PeopleSimulator() {
   console.log("PeopleSimulator is initializing");
 
   var createRider = function() {
-    var iFloor, iDestination;               // init for logic test
+    var iFloor;                     // records the floor this Rider is "inserted" on
+    var iDestination;               // records the floor this Rider will be travelling to
 
     do {
       iFloor = Math.floor((Math.random() * env.cFloors) + 1);
       iDestination = Math.floor((Math.random() * env.cFloors) + 1);
     }
     while (iFloor == iDestination);    // kickout when iFloor and iDestination are different!
-    activeRiders[cRiders] = new Rider(iFloor, iDestination);
     cRiders ++;
-    console.log("New rider; onBoard(%s) --> destination(%d)", iFloor, iDestination)
+    activeRiders[cRiders] = new Rider(cRiders, iFloor, iDestination);
 
     // set timer to auto-create a new Rider based at the next (randomized) interval
     if (cRiders < env.cNumOfSimulatedRiders) {
@@ -209,12 +210,22 @@ function PeopleSimulator() {
   createRider();
 }
 
-// Simple RIDER class used to encapsulated Rider elements
-function Rider(onboardFloor, destinationFloor) {
-  const inst = this
+/********************************************
+ RIDER
 
-  inst.onboardFloor = onboardFloor
-  inst.desinationFloor = destinationFloor
+ used to encapsulated Rider elements
+*********************************************/
+function Rider(id, onBoardFloor, destinationFloor) {
+  const me = this;
+  me.myID = id;
+  me.onboardFloor = onBoardFloor;
+  me.desinationFloor = destinationFloor;
+
+  console.log("New rider; onBoard(%s) --> destination(%d)", onBoardFloor, destinationFloor);
+
+  // in order to save processing "overhead", we're going to move the logic of "processing" of New Rider
+  // to the Floor Controller. (In other words, we'll turn the Floor Controller into a pseudo Concierge)
+  floors[onBoardFloor].concierge(me)
 }
 
 /********************************************
@@ -235,6 +246,7 @@ function FloorController(floorNumber) {
     const inst = this;
     const off = 0;                                                   // const: indicates "call-state"
     const on = 1;                                                    // const: indicates "call-state"
+    const ridersWaiting = [];                                        // for for riders waiting the onBoard process
 
     inst.myFloorNumber = floorNumber;                               // Floors start with #1
     inst.myFloorHeight = (floorNumber - 1) * env.iFloorHeight;      // Floor-height is measured zero-based
@@ -244,9 +256,12 @@ function FloorController(floorNumber) {
     // check the "state" of the elevator
     console.log("Floor Controller #" + floorNumber + " has been created");
 
-
-
-}
+    inst.concierge = function(rider) {
+      // add this rider to the waiting queue
+      ridersWaiting.push(rider);
+      console.log("Floor Controller #" + inst.myFloorNumber + " has new Rider [" + rider.myID +"]");
+    }
+ }
 
 
 // process.exit();
