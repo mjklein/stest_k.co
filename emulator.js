@@ -21,7 +21,6 @@
   };
 
 
-
 /**
  * REDIS
  *
@@ -43,21 +42,13 @@
  TODO:  Since Redis is used to provide ppersitence as a state-machine, this sections would (time permitting) incorporate
         the procedural steps needed to re-initialize the system following a soft-failure.
  ********************************************/
-
   const carriages = [];
-
   for (var i = 1; i <= env.cElevators; i++) {
-    carriages[i] = new Carriage(i)
+    carriages[i] = new Carriage(i);
   };
 
-  console.log(carriages[5].myID);
-
-
-
-
-
-
-
+  // 1-second interval timer (to sync all processing actions...)
+  var heartbeatTimer = setInterval(heartbeatProcessor, 1000);
 
 
   // visual feedback in Init-process completion
@@ -66,12 +57,29 @@
   console.log(new Date() + ' ==> System initialized');
 
 
-
-
-
-
-
 /*******************************************
+ HELPER Functions
+*******************************************/
+function heartbeatProcessor() {
+    console.log(new Date() + ' ==> System Heartbeat...');
+
+    // every heartbeat will trigger the following:
+    // + move carriages in transit
+    // + determine which carriages need to stop (and let Riders exit)
+    // + determine which floors have initiate a Carriage Call
+
+    for (var i = 1; i <= env.cElevators; i++) {
+        carriages[i].move();
+    }
+    ;
+};
+
+
+
+
+
+
+/********************************************
   ELEVATOR CARRIAGE
 
   This is the CARRIAGE Class which is uniquely instantiated for each instance of an elevator (shaft). The number
@@ -84,26 +92,27 @@
 
 
  ********************************************/
-function Carriage(idx, riders, location, direction) {
+function Carriage(idx, riders, location, state) {
   var inst = this;
+  var up = 1;
+  var down = 2;
+  var idle = 3;
+  var states = ["Up", "Down", "Idle"]
 
-  inst.myID = idx;                  // self-identifier (indexer value)
-  inst.cTrip = 0;                 // trip counter
-  inst.cFloor = 0;                // floor counter
+    inst.myID = idx;                // self-identifier (indexer value)
+    inst.cTrip = 0;                 // trip counter
+    inst.cFloor = 0;                // floor counter
+    inst.state = state == undefined ? idle : state // idle the carriage (if 'state' param is undefined)
+
+  inst.move = function() {
+    // check the "state" of the elevator
+    console.log("Carriage #" + inst.myID + " state is: " + states[inst.state - 1]); // offset for zero-based Array
 
 
-  return;
+  };
 };
 
 
 
-
-
-
-
-
-
-
-
-process.exit();
+// process.exit();
 
